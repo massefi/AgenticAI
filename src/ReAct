@@ -1,1 +1,112 @@
+#Install all dependency packages for the course
+#Remember to execute this before running any of the exercises
+!pip install tenacity==9.0.0
+!pip install langchain==0.3.12
+!pip install langchain-openai==0.2.12
+!pip install langchain_community==0.3.12
+!pip install langgraph==0.2.59
+!pip install pysqlite3-binary==0.5.4
+!pip install langchain_chroma==0.1.4
+!pip install pandas==2.2.3
+!pip install pypdf==5.1.0
+!pip install nbformat==5.10.4
 
+
+from langchain_core.tools import tool
+
+#Tool annotation identifies a function as a tool automatically
+@tool
+def find_sum(x:int, y:int) -> int :
+    #The docstring comment describes the capabilities of the function
+    #It is used by the agent to discover the function's inputs, outputs and capabilities
+    """
+    This function is used to add two numbers and return their sum.
+    It takes two integers as inputs and returns an integer as output.
+    """
+    return x + y
+
+@tool
+def find_product(x:int, y:int) -> int :
+    """
+    This function is used to multiply two numbers and return their product.
+    It takes two integers as inputs and returns an integer as ouput.
+    """
+    return x * y
+
+
+from langchain_openai import AzureChatOpenAI
+import os
+
+# 1. API info - Using the key and endpoint you just generated
+os.environ["AZURE_OPENAI_API_KEY"] = ""
+# Ensure the endpoint ends with /openai/ if using standard LangChain wrappers
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://agentic-ai-rg.services.ai.azure.com/"
+
+# 2. Setup the LLM
+# Change azure_deployment to match your successful 'gpt-oss-120b' deployment
+model = AzureChatOpenAI(
+    azure_deployment="gpt-oss-120b", 
+    api_version="2024-05-01-preview", # Updated to a version that supports gpt-4o/oss models
+    model="gpt-oss-120b"
+)
+
+# 3. Test the model
+# Use 'model' (the variable name you defined above)
+response = model.invoke("Hello, how are you?")
+print(response.content)
+
+
+from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import AIMessage,HumanMessage,SystemMessage
+
+#Create list of tools available to the agent
+agent_tools=[find_sum, find_product]
+
+#System prompt
+system_prompt = SystemMessage(
+    """You are a Math genius who can solve math problems. Solve the
+    problems provided by the user, by using only tools available. 
+    Do not solve the problem yourself"""
+)
+
+agent_graph=create_react_agent(
+    model=model, 
+    state_modifier=system_prompt,
+    tools=agent_tools)
+
+
+#Example 1
+inputs = {"messages":[("user","what is the sum of 2 and 3 ?")]}
+
+result = agent_graph.invoke(inputs)
+
+#Get the final answer
+print(f"Agent returned : {result['messages'][-1].content} \n")
+
+print("Step by Step execution : ")
+for message in result['messages']:
+    print(message.pretty_repr())
+
+
+#Example 2
+inputs = {"messages":[("user","What is 3 multipled by 2 and 5 + 1 ?")]}
+
+result = agent_graph.invoke(inputs)
+
+#Get the final answer
+print(f"Agent returned : {result['messages'][-1].content} \n")
+
+print("Step by Step execution : ")
+for message in result['messages']:
+    print(message.pretty_repr())
+
+
+agent_graph=create_react_agent(
+    model=model, 
+    state_modifier=system_prompt,
+    tools=agent_tools,
+    debug=True)
+
+inputs = {"messages":[("user","what is the sum of 2 and 3 ?")]}
+
+result = agent_graph.invoke(inputs)
